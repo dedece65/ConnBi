@@ -9,17 +9,19 @@ load_dotenv()
 def conectar_sage():
     try:
         # Estos datos te los dará el partner
-        server = os.getenv('SAGE_SERVER')
-        database = os.getenv('SAGE_DATABASE')
-        username = os.getenv('SAGE_USERNAME')
-        password = os.getenv('SAGE_PASSWORD')
+        server = os.getenv('DB_SERVER')
+        database = os.getenv('DB_DATABASE')
+        username = os.getenv('DB_USERNAME')
+        password = os.getenv('DB_PASSWORD')
+        driver = os.getenv('DB_DRIVER')
+        port = os.getenv('DB_PORT')
         
         # El driver que instalamos en el paso 1
         conn_str = (
             f'DRIVER={{{driver}}};'
             f'SERVER={server},{port};'
             f'DATABASE={database};'
-            f'UID={user};'
+            f'UID={username};'
             f'PWD={password};'
             f'Encrypt=no;'
             f'TrustServerCertificate=yes;'
