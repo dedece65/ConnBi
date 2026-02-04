@@ -11,23 +11,23 @@ def conectar_sage():
         # Estos datos te los dará el partner
         server = os.getenv('DB_SERVER')
         database = os.getenv('DB_DATABASE')
-        username = os.getenv('DB_USERNAME')
+        username = os.getenv('DB_USER')
         password = os.getenv('DB_PASSWORD')
         driver = os.getenv('DB_DRIVER')
         port = os.getenv('DB_PORT')
         
-        # El driver que instalamos en el paso 1
-        conn_str = (
-            f'DRIVER={{{driver}}};'
-            f'SERVER={server},{port};'
-            f'DATABASE={database};'
-            f'UID={username};'
-            f'PWD={password};'
-            f'Encrypt=no;'
-            f'TrustServerCertificate=yes;'
+        # Usamos kwargs para seguridad y manejo de caracteres especiales
+        conn = pyodbc.connect(
+            driver=f'{{{driver}}}',
+            server=f'{server},{port}',
+            database=database,
+            uid=username,
+            pwd=password,
+            Encrypt='no',
+            TrustServerCertificate='yes'
         )
 
-        conn = pyodbc.connect(conn_str)
+
         print("✅ Conexión exitosa a Sage 50")
         return conn
     except Exception as e:

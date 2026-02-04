@@ -87,18 +87,17 @@ def listar_bases_datos():
     print("-" * 30)
 
     # Conectamos a 'master' para poder ver el listado global
-    conn_str = (
-        f'DRIVER={{{driver}}};'
-        f'SERVER={server},{port};'
-        f'DATABASE=master;'
-        f'UID={username};'
-        f'PWD={password};'
-        f'Encrypt=no;'
-        f'TrustServerCertificate=yes;'
-    )
-
+    # Usamos kwargs para que pyodbc maneje el escapado de contraseñas con caracteres especiales
     try:
-        conn = pyodbc.connect(conn_str)
+        conn = pyodbc.connect(
+            driver=f'{{{driver}}}',
+            server=f'{server},{port}',
+            database='master',
+            uid=username,
+            pwd=password,
+            Encrypt='no',
+            TrustServerCertificate='yes'
+        )
         cursor = conn.cursor()
         
         # Consulta para obtener todas las bases de datos de usuario (excluyendo las del sistema)
