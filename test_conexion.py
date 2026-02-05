@@ -8,19 +8,17 @@ load_dotenv()
 
 def conectar_sage():
     try:
-        # Estos datos te los dará el partner
         server = os.getenv('DB_SERVER')
-        database = os.getenv('DB_DATABASE')
+        database = os.getenv('DB_NAME')
         username = os.getenv('DB_USER')
-        password = os.getenv('DB_PASSWORD')
+        password = os.getenv('DB_PASS')
         driver = os.getenv('DB_DRIVER')
         port = os.getenv('DB_PORT')
         
-        # Usamos kwargs para seguridad y manejo de caracteres especiales
         conn = pyodbc.connect(
             driver=f'{{{driver}}}',
             server=f'{server},{port}',
-            database=database,
+            database="2008FW",
             uid=username,
             pwd=password,
             Encrypt='no',
@@ -36,9 +34,9 @@ def conectar_sage():
 
 # Prueba de lectura
 conexion = conectar_sage()
-if conexion:
-    # Esta query es un ejemplo, cámbiala por la de tu bot
-    query = "SELECT TOP 10 * FROM [Gestion!Factu]"
-    df = pd.read_sql(query, conexion)
-    print(df)
-    conexion.close()
+# if conexion:
+#     # Esta query es un ejemplo, cámbiala por la de tu bot
+#     query = "SELECT TOP 10 * FROM [Gestion!Factu]"
+#     df = pd.read_sql(query, conexion)
+#     print(df)
+#     conexion.close()

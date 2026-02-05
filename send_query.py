@@ -72,15 +72,20 @@ def listar_bases_datos():
         cursor = conn.cursor()
         
         # Consulta para obtener todas las bases de datos de usuario (excluyendo las del sistema)
-        query = "SELECT name FROM sys.databases WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb') ORDER BY name"
+        query = "SELECT \
+    RTRIM(LTRIM(NOMBRE2)) AS [Nombre Empresa], \
+    RTRIM(LTRIM(CIF)) AS [NIF] \
+FROM [COMU0001].dbo.OPCEMP"
+
         cursor.execute(query)
         
         dbs = cursor.fetchall()
         
-        print(f"\n✅ Conexión exitosa. Se han encontrado {len(dbs)} bases de datos:")
+        print(f"Consulta: {query}")
+        print(f"\n✅ Conexión exitosa. Se han encontrado {len(dbs)} datos:")
         print("-" * 40)
         for row in dbs:
-            print(f"📁 {row.name}")
+            print(f"📁 {row}")
         print("-" * 40)
         
         conn.close()
