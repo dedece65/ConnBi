@@ -6,7 +6,9 @@ import pyodbc
 import os
 import webbrowser
 from dotenv import load_dotenv
-
+import pandas as pd
+import io
+import datetime
 # Cargar variables
 env_path = os.path.join(os.getcwd(), '.env')
 load_dotenv(env_path, override=True)
@@ -37,6 +39,8 @@ HTML_TEMPLATE = """
         th {{ background-color: #f2f2f2; color: #333; }}
         .error {{ color: #dc3545; background: #f8d7da; padding: 10px; border-radius: 4px; }}
         .success {{ color: #155724; background: #d4edda; padding: 10px; border-radius: 4px; }}
+        button.export {{ background: #17a2b8; }}
+        button.export:hover {{ background: #138496; }}
     </style>
 </head>
 <body>
@@ -51,7 +55,8 @@ HTML_TEMPLATE = """
             <label for="query">Consulta:</label>
             <textarea name="query" id="query" placeholder="Escribe tu consulta SQL aquí...">{last_query}</textarea>
             <br>
-            <button type="submit">Ejecutar Consulta</button>
+            <button type="submit" name="action" value="run">Ejecutar Consulta</button>
+            <button type="submit" name="action" value="export" class="export">Descargar Excel</button>
         </form>
 
         <div class="result-box">
@@ -61,6 +66,15 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+def fix_encoding(text):
+    """Corriges problemas de codificación (UTF-8 interpretado como Latin-1)."""
+    if isinstance(text, str):
+        try:
+            return text.encode('latin-1').decode('utf-8')
+        except:
+            return text
+    return text
 
 def get_databases():
     """Obtiene la lista de bases de datos disponibles."""
@@ -84,7 +98,9 @@ def get_databases():
             TrustServerCertificate='yes'
         )
         cursor = conn.cursor()
-        query = "SELECT name FROM sys.databases WHERE name NOT IN ('tempdb', 'model', 'msdb') ORDER BY name"
+        query = "SELECT name FROM sys.databases \
+                WHERE name NOT IN ('tempdb', 'model', 'msdb') \
+                ORDER BY name"
         cursor.execute(query)
         dbs = [row[0] for row in cursor.fetchall()]
         conn.close()
@@ -130,6 +146,36 @@ class QueryHandler(http.server.SimpleHTTPRequestHandler):
             options += f'<option value="{db}" {is_selected}>{db}</option>'
         return options
 
+    def export_to_excel(self, query, db_name):
+        try:
+            conn = self.get_connection(db_name)
+            df = pd.read_sql(query, conn)
+            conn.close()
+            
+            # Corregir encoding en todo el DataFrame
+            df = df.applymap(fix_encoding)
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Resultados')
+            
+            output.seek(0)
+            
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"consulta_{timestamp}.xlsx"
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", f"attachment; filename={filename}")
+            self.end_headers()
+            self.wfile.write(output.read())
+            return True
+        except Exception as e:
+            # En caso de error, retornamos False y dejamos que do_POST maneje el error mostrándolo en HTML
+             # (Aunque idealmente deberíamos mostrar el error en la página, pero como es una descarga de archivo, es tricky)
+             # Para simplificar, si falla la descarga, mostramos el error como HTML
+            return str(e)
+
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -145,10 +191,20 @@ class QueryHandler(http.server.SimpleHTTPRequestHandler):
         
         query = params.get('query', [''])[0].strip()
         selected_db = params.get('database', [''])[0].strip()
+        action = params.get('action', ['run'])[0].strip()
         
-        result_html = ""
+        if action == 'export' and query and selected_db:
+            result = self.export_to_excel(query, selected_db)
+            if result is True:
+                return # La respuesta ya fue enviada
+            else:
+                # Si hubo error (result es str), lo mostramos en la página
+                result_html = f'<div class="error">❌ Error exportando a Excel: {result}</div>'
+                # Continuamos para renderizar la página con el error
+        else:
+            result_html = ""
         
-        if query and selected_db:
+        if action == 'run' and query and selected_db:
             try:
                 conn = self.get_connection(selected_db)
                 cursor = conn.cursor()
@@ -164,7 +220,9 @@ class QueryHandler(http.server.SimpleHTTPRequestHandler):
                         header = "".join(f"<th>{col}</th>" for col in columns)
                         body = ""
                         for row in rows:
-                            cells = "".join(f"<td>{cell}</td>" for cell in row)
+                            # Aplicar corrección de encoding a las celdas
+                            fixed_row = [fix_encoding(cell) for cell in row]
+                            cells = "".join(f"<td>{cell}</td>" for cell in fixed_row)
                             body += f"<tr>{cells}</tr>"
                         
                         result_html = f"""
@@ -172,14 +230,14 @@ class QueryHandler(http.server.SimpleHTTPRequestHandler):
                         <table><thead><tr>{header}</tr></thead><tbody>{body}</tbody></table>
                         """
                     else:
-                         # No devuelve filas pero es exitoso (ej. SET NOCOUNT ON)
-                         conn.commit()
-                         result_html = f'<div class="success">✅ Operación ejecutada con éxito en <strong>{selected_db}</strong>.</div>'
+                            # No devuelve filas pero es exitoso (ej. SET NOCOUNT ON)
+                            conn.commit()
+                            result_html = f'<div class="success">✅ Operación ejecutada con éxito en <strong>{selected_db}</strong>.</div>'
                 except pyodbc.ProgrammingError:
                     # No devuelve filas (INSERT/UPDATE)
                     conn.commit()
                     result_html = f'<div class="success">✅ Operación ejecutada con éxito en <strong>{selected_db}</strong>.</div>'
-                
+            
                 conn.close()
             except Exception as e:
                 result_html = f'<div class="error">❌ Error: {str(e)}</div>'
